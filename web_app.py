@@ -1,7 +1,8 @@
 """
-web_app.py - GLV PS5 Audio Extractor (Web Edition)
+web_app.py - GLV PS5 Audio & Video Extractor (Web Edition)
 A zero-dependency local web application engineered for macOS, Windows, and Linux.
-Runs locally in any browser (Safari, Chrome, Firefox) without GUI rendering issues.
+Converts PS5 WebM gameplay into NLE-compatible Apple ProRes 422 MOV, Calibrated MP4 (zero washout),
+or studio-grade audio masters (24-bit PCM WAV, MP3, AAC, FLAC, Opus).
 """
 
 import http.server
@@ -30,7 +31,7 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 TEMP_UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "glv_uploads")
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 
-# Active extraction jobs
+# Active extraction/conversion jobs
 jobs: Dict[str, Dict[str, Any]] = {}
 
 
@@ -83,7 +84,7 @@ def format_bytes(bytes_count: int) -> str:
 
 
 def probe_webm(file_path: str) -> Dict[str, Any]:
-    """Scan WebM file with ffprobe and extract deep audio properties."""
+    """Scan WebM file with ffprobe and extract deep audio & video properties."""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -119,6 +120,7 @@ def probe_webm(file_path: str) -> Dict[str, Any]:
     duration_sec = float(fmt.get("duration", 0.0))
     file_size = int(fmt.get("size", os.path.getsize(file_path)))
 
+    v_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
     a_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
 
     audio_info = {
@@ -151,6 +153,16 @@ def probe_webm(file_path: str) -> Dict[str, Any]:
             "bitrate_kbps": round(bitrate / 1000) if bitrate else 160,
         }
 
+    video_info = None
+    if v_stream:
+        video_info = {
+            "codec": v_stream.get("codec_name", "unknown").upper(),
+            "width": int(v_stream.get("width", 0)),
+            "height": int(v_stream.get("height", 0)),
+            "color_range": v_stream.get("color_range", "unknown"),
+            "color_space": v_stream.get("color_space", "unknown"),
+        }
+
     return {
         "file_path": os.path.abspath(file_path),
         "file_name": os.path.basename(file_path),
@@ -160,6 +172,7 @@ def probe_webm(file_path: str) -> Dict[str, Any]:
         "duration_sec": duration_sec,
         "duration_formatted": format_duration(duration_sec),
         "audio": audio_info,
+        "video": video_info,
     }
 
 
@@ -206,7 +219,7 @@ def parse_multipart(body_bytes: bytes, boundary: str) -> Tuple[Optional[str], Op
     return None, None
 
 
-# --- Extraction Worker Thread ---
+# --- Conversion / Extraction Worker Thread ---
 
 def run_extraction_worker(job_id: str, file_path: str, fmt: str, sample_rate: str):
     job = jobs[job_id]
@@ -216,43 +229,96 @@ def run_extraction_worker(job_id: str, file_path: str, fmt: str, sample_rate: st
     ffmpeg_bin = find_binary("ffmpeg")
 
     ext = ".wav"
-    audio_codec_args = []
+    codec_args = []
+    is_video = False
 
-    if "WAV (24-bit Studio PCM)" in fmt:
+    # 1. Video + Audio Profiles (NLE Calibrated)
+    if "Apple ProRes 422 MOV" in fmt:
+        ext = "_PS5_ProRes422.mov"
+        is_video = True
+        codec_args = [
+            "-c:v", "prores_ks",
+            "-profile:v", "3",
+            "-vendor", "apl0",
+            "-pix_fmt", "yuv422p10le",
+            "-color_range", "tv",
+            "-colorspace", "bt709",
+            "-color_primaries", "bt709",
+            "-color_trc", "bt709",
+            "-c:a", "pcm_s24le",
+        ]
+    elif "Calibrated MP4 (H.264" in fmt:
+        ext = "_PS5_Calibrated.mp4"
+        is_video = True
+        codec_args = [
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "17",
+            "-pix_fmt", "yuv420p",
+            "-vf", "scale=in_range=auto:out_range=limited:flags=lanczos+accurate_rnd",
+            "-color_range", "tv",
+            "-colorspace", "bt709",
+            "-color_primaries", "bt709",
+            "-color_trc", "bt709",
+            "-bsf:v", "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0",
+            "-c:a", "aac",
+            "-b:a", "256k",
+            "-movflags", "+faststart",
+        ]
+    elif "Calibrated MP4 (HEVC" in fmt:
+        ext = "_PS5_HDR_HEVC.mp4"
+        is_video = True
+        codec_args = [
+            "-c:v", "libx265",
+            "-preset", "fast",
+            "-crf", "18",
+            "-pix_fmt", "yuv420p10le",
+            "-vf", "scale=in_range=auto:out_range=limited:flags=lanczos+accurate_rnd",
+            "-color_range", "tv",
+            "-colorspace", "bt2020nc",
+            "-color_primaries", "bt2020",
+            "-color_trc", "smpte2084",
+            "-bsf:v", "hevc_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0",
+            "-c:a", "aac",
+            "-b:a", "256k",
+            "-movflags", "+faststart",
+        ]
+    # 2. Audio Only Profiles
+    elif "WAV (24-bit Studio PCM)" in fmt:
         ext = "_PS5_Audio_24bit.wav"
-        audio_codec_args = ["-c:a", "pcm_s24le"]
+        codec_args = ["-vn", "-c:a", "pcm_s24le"]
     elif "WAV (16-bit Lossless PCM)" in fmt:
         ext = "_PS5_Audio_16bit.wav"
-        audio_codec_args = ["-c:a", "pcm_s16le"]
+        codec_args = ["-vn", "-c:a", "pcm_s16le"]
     elif "MP3 (320 kbps Audiophile)" in fmt:
         ext = "_PS5_Audio_320k.mp3"
-        audio_codec_args = ["-c:a", "libmp3lame", "-b:a", "320k", "-q:a", "0"]
+        codec_args = ["-vn", "-c:a", "libmp3lame", "-b:a", "320k", "-q:a", "0"]
     elif "AAC / M4A (256 kbps Studio)" in fmt:
         ext = "_PS5_Audio_256k.m4a"
-        audio_codec_args = ["-c:a", "aac", "-b:a", "256k"]
+        codec_args = ["-vn", "-c:a", "aac", "-b:a", "256k"]
     elif "FLAC (Lossless Compressed)" in fmt:
         ext = "_PS5_Audio.flac"
-        audio_codec_args = ["-c:a", "flac", "-compression_level", "8"]
+        codec_args = ["-vn", "-c:a", "flac", "-compression_level", "8"]
     elif "Opus (Stream Copy)" in fmt:
         ext = "_PS5_Audio_Original.opus"
-        audio_codec_args = ["-c:a", "copy"]
+        codec_args = ["-vn", "-c:a", "copy"]
     else:
         ext = "_PS5_Audio.wav"
-        audio_codec_args = ["-c:a", "pcm_s24le"]
+        codec_args = ["-vn", "-c:a", "pcm_s24le"]
 
     output_file = os.path.join(output_dir, f"{base_name}{ext}")
     job["output_file"] = output_file
     job["output_filename"] = os.path.basename(output_file)
+    job["is_video"] = is_video
 
     cmd = [
         ffmpeg_bin,
         "-y",
         "-i", file_path,
-        "-vn",
     ]
-    cmd.extend(audio_codec_args)
+    cmd.extend(codec_args)
 
-    if sample_rate and sample_rate != "Original" and "-c:a copy" not in " ".join(audio_codec_args):
+    if sample_rate and sample_rate != "Original" and "-c:a copy" not in " ".join(codec_args) and not is_video:
         cmd.extend(["-ar", sample_rate])
 
     cmd.extend([
@@ -279,7 +345,7 @@ def run_extraction_worker(job_id: str, file_path: str, fmt: str, sample_rate: st
         )
 
         total_dur = job.get("total_duration", 0.0)
-        speed_val = "1.0x"
+        action_verb = "Converting video" if is_video else "Extracting audio"
 
         while True:
             line = proc.stdout.readline()
@@ -300,11 +366,10 @@ def run_extraction_worker(job_id: str, file_path: str, fmt: str, sample_rate: st
                         pct = min(cur_sec / total_dur, 1.0) if total_dur > 0 else 0.5
                         job["progress"] = pct
                         job["current_sec"] = cur_sec
-                        job["status_message"] = f"Extracting: {format_duration(cur_sec)} / {format_duration(total_dur)} ({int(pct*100)}%)"
+                        job["status_message"] = f"{action_verb}: {format_duration(cur_sec)} / {format_duration(total_dur)} ({int(pct*100)}%)"
                     except ValueError:
                         pass
                 elif k == "speed":
-                    speed_val = v
                     job["speed"] = v
                 elif k == "progress" and v == "end":
                     job["progress"] = 1.0
@@ -316,11 +381,11 @@ def run_extraction_worker(job_id: str, file_path: str, fmt: str, sample_rate: st
 
         if ret == 0:
             job["success"] = True
-            job["status_message"] = f"✔ Extracted successfully in {elapsed:.2f}s!"
+            job["status_message"] = f"✔ Complete in {elapsed:.2f}s! Saved {os.path.basename(output_file)}"
         else:
             stderr_out = proc.stderr.read() if proc.stderr else ""
             job["success"] = False
-            job["error"] = stderr_out[:300] or f"FFmpeg exited with code {ret}"
+            job["error"] = stderr_out[:350] or f"FFmpeg exited with code {ret}"
     except Exception as e:
         job["done"] = True
         job["success"] = False
@@ -376,7 +441,11 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
                 file_size = os.path.getsize(target_file)
 
                 ct = "audio/wav"
-                if target_file.endswith(".mp3"):
+                if target_file.endswith(".mp4"):
+                    ct = "video/mp4"
+                elif target_file.endswith(".mov"):
+                    ct = "video/quicktime"
+                elif target_file.endswith(".mp3"):
                     ct = "audio/mpeg"
                 elif target_file.endswith(".m4a") or target_file.endswith(".aac"):
                     ct = "audio/mp4"
@@ -451,7 +520,7 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
             data = json.loads(body.decode("utf-8"))
 
             file_path = data.get("file_path", "")
-            fmt = data.get("format", "WAV (24-bit Studio PCM)")
+            fmt = data.get("format", "Apple ProRes 422 MOV (Final Cut, Premiere, DaVinci)")
             sr = data.get("sample_rate", "Original")
 
             if not os.path.exists(file_path):
@@ -467,7 +536,7 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
                     "total_duration": meta["duration_sec"],
                     "progress": 0.0,
                     "speed": "",
-                    "status_message": "Initializing extraction...",
+                    "status_message": "Initializing...",
                     "done": False,
                     "success": False,
                     "error": "",
@@ -525,7 +594,7 @@ def main():
     server_url = f"http://{HOST}:{port}"
 
     print("=========================================================")
-    print("  🎮 GLV PS5 Audio Extractor — Web Edition")
+    print("  🎮 GLV PS5 Audio & Video Extractor — Web Edition")
     print("=========================================================")
     print(f"  Server running locally at: {server_url}")
     print("  Opening default browser...")

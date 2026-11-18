@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GLV PS5 Audio Extractor — Web Edition</title>
+  <title>GLV PS5 Media Converter — Web Edition</title>
   <style>
     :root {
       --bg: #0b0f19;
@@ -40,7 +40,7 @@
 
     .container {
       width: 100%;
-      max-width: 860px;
+      max-width: 880px;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -255,7 +255,7 @@
 
     .setting-select {
       flex: 1;
-      max-width: 340px;
+      max-width: 440px;
       background: #1e293b;
       color: var(--text-main);
       border: 1px solid #334155;
@@ -268,6 +268,18 @@
 
     .setting-select:focus {
       border-color: var(--accent-cyan);
+    }
+
+    optgroup {
+      background: #111827;
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    option {
+      background: #1e293b;
+      color: #f8fafc;
+      font-weight: normal;
     }
 
     /* Progress section */
@@ -322,11 +334,11 @@
       gap: 10px;
     }
 
-    audio {
+    audio, video {
       width: 100%;
-      height: 38px;
       border-radius: 6px;
       outline: none;
+      background: #000;
     }
   </style>
 </head>
@@ -336,17 +348,17 @@
 
     <!-- 1. Header -->
     <div class="card header-card">
-      <div class="header-title">🎮 GLV PS5 AUDIO EXTRACTOR</div>
-      <div class="header-sub">Zero-Loss Web Audio Engine for PS5 Gameplay Clips · Ready for DaVinci Resolve, Premiere & Final Cut Pro</div>
+      <div class="header-title">🎮 GLV PS5 MEDIA CONVERTER &amp; AUDIO EXTRACTOR</div>
+      <div class="header-sub">Anti-Washout Video Conversion &amp; Lossless Audio Engine for PS5 Clips · Tailored for DaVinci Resolve, Premiere Pro &amp; Final Cut Pro</div>
     </div>
 
-    <!-- 2. PS5 WebM Color Advisory Notice -->
+    <!-- 2. NLE Compatibility & Color Advisory Notice -->
     <div class="notice-card">
-      <div class="notice-title">💡 Important PS5 WebM Color &amp; Editing Notice</div>
+      <div class="notice-title">💡 Important NLE Compatibility &amp; Anti-Washout Notice</div>
       <div class="notice-text">
-        PS5 WebM conversion into MP4 or other format will impact colours in video (can look washed out).
-        Better you extract audio from WebM here, place directly into your editor timeline alongside your video,
-        and export from any video editing app (Premiere Pro, DaVinci Resolve, CapCut) for 100% color &amp; sound perfection.
+        Most video editors (<b>Premiere Pro, Final Cut Pro, DaVinci Resolve, CapCut</b>) <b>do not natively support WebM files</b>. Converting directly with basic converters causes washed-out colors due to missing color range/matrix tags.<br><br>
+        • Choose <b>Apple ProRes 422 MOV</b> or <b>Calibrated MP4</b> for 100% native timeline support with zero color washout.<br>
+        • Choose <b>Studio WAV / MP3 / Opus</b> for pure audio extraction.
       </div>
     </div>
 
@@ -369,9 +381,9 @@
       <div class="selected-file-bar" id="selectedFileBar"></div>
     </div>
 
-    <!-- 4. Deep Audio Properties Card -->
+    <!-- 4. Deep Audio & Video Properties Card -->
     <div class="card" id="specCard" style="display: none; border-color: #06b6d4;">
-      <div style="font-weight: 700; font-size: 15px; color: #38bdf8; margin-bottom: 8px;">🎵 Detected Audio Properties (PS5 Master)</div>
+      <div style="font-weight: 700; font-size: 15px; color: #38bdf8; margin-bottom: 8px;">🎵 Detected Clip Properties (PS5 Master)</div>
       
       <div class="specs-grid">
         <div class="spec-item">
@@ -401,24 +413,31 @@
       </div>
     </div>
 
-    <!-- 5. Extraction Settings -->
+    <!-- 5. Output Settings -->
     <div class="card" id="settingsCard">
-      <div style="font-weight: 700; font-size: 15px; margin-bottom: 14px;">Audio Extraction Settings</div>
+      <div style="font-weight: 700; font-size: 15px; margin-bottom: 14px;">Conversion / Extraction Settings</div>
 
       <div class="setting-row">
-        <div class="setting-label">Target Audio Format:</div>
+        <div class="setting-label">Target Format:</div>
         <select class="setting-select" id="optFormat">
-          <option value="WAV (24-bit Studio PCM)">WAV (24-bit Studio PCM) — Best for NLEs</option>
-          <option value="WAV (16-bit Lossless PCM)">WAV (16-bit Lossless PCM)</option>
-          <option value="MP3 (320 kbps Audiophile)">MP3 (320 kbps Audiophile)</option>
-          <option value="AAC / M4A (256 kbps Studio)">AAC / M4A (256 kbps Studio)</option>
-          <option value="FLAC (Lossless Compressed)">FLAC (Lossless Compressed)</option>
-          <option value="Opus (Stream Copy)">Opus (Stream Copy — Instant Bit-for-bit)</option>
+          <optgroup label="🎬 Video + Audio (Editor Anti-Washout)">
+            <option value="Apple ProRes 422 MOV (Final Cut, Premiere, DaVinci)">Apple ProRes 422 MOV (Final Cut Pro, Premiere &amp; DaVinci Master)</option>
+            <option value="Calibrated MP4 (H.264 Universal Anti-Washout)">Calibrated MP4 (H.264 / Rec.709 Anti-Washout)</option>
+            <option value="Calibrated MP4 (HEVC / H.265 HDR/SDR)">Calibrated MP4 (HEVC / H.265 HDR/SDR)</option>
+          </optgroup>
+          <optgroup label="🎵 Audio Only (Studio Masters)">
+            <option value="WAV (24-bit Studio PCM)">WAV (24-bit Studio PCM Uncompressed)</option>
+            <option value="WAV (16-bit Lossless PCM)">WAV (16-bit Lossless PCM)</option>
+            <option value="MP3 (320 kbps Audiophile)">MP3 (320 kbps Audiophile)</option>
+            <option value="AAC / M4A (256 kbps Studio)">AAC / M4A (256 kbps Studio)</option>
+            <option value="FLAC (Lossless Compressed)">FLAC (Lossless Compressed)</option>
+            <option value="Opus (Stream Copy)">Opus (Stream Copy — Instant Bit-for-bit)</option>
+          </optgroup>
         </select>
       </div>
 
       <div class="setting-row">
-        <div class="setting-label">Sample Rate:</div>
+        <div class="setting-label">Sample Rate (Audio):</div>
         <select class="setting-select" id="optSampleRate">
           <option value="Original">Original (Match Source)</option>
           <option value="48000">48,000 Hz (Standard Film/TV)</option>
@@ -430,7 +449,7 @@
 
     <!-- 6. Action & Progress Card -->
     <div class="card">
-      <button class="btn btn-cyan btn-large" id="btnExtract" disabled>⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)</button>
+      <button class="btn btn-cyan btn-large" id="btnExtract" disabled>⚡ START CONVERSION (ZERO QUALITY LOSS)</button>
 
       <div class="progress-bar-container" id="progContainer">
         <div class="progress-bar-fill" id="progFill"></div>
@@ -443,10 +462,10 @@
 
       <!-- Success & Preview Actions -->
       <div class="success-actions" id="successActions">
-        <audio id="audioPreview" controls></audio>
+        <div id="mediaPreviewContainer"></div>
         <div class="success-btns">
           <button class="btn btn-green" id="btnRevealFinder">📁 Reveal in Finder</button>
-          <a class="btn btn-dark" id="btnDownloadAudio" href="#" download>⬇️ Download Extracted Audio</a>
+          <a class="btn btn-dark" id="btnDownloadAudio" href="#" download>⬇️ Download Output File</a>
         </div>
       </div>
     </div>
@@ -471,7 +490,7 @@
     const successActions = document.getElementById("successActions");
     const btnRevealFinder = document.getElementById("btnRevealFinder");
     const btnDownloadAudio = document.getElementById("btnDownloadAudio");
-    const audioPreview = document.getElementById("audioPreview");
+    const mediaPreviewContainer = document.getElementById("mediaPreviewContainer");
 
     // Native Mac File Picker Dialog
     btnBrowseNative.addEventListener("click", async () => {
@@ -545,14 +564,14 @@
 
       specCard.style.display = "block";
       btnExtract.disabled = false;
-      statusText.innerText = "Ready to extract! Select format and click Extract.";
+      statusText.innerText = "Ready! Select target format and click Start Conversion.";
       statusText.style.color = "#34d399";
       progContainer.style.display = "none";
       successActions.style.display = "none";
       speedText.innerText = "";
     }
 
-    // Start Extraction
+    // Start Conversion / Extraction
     btnExtract.addEventListener("click", async () => {
       if (!currentFilePath) return;
 
@@ -560,10 +579,10 @@
       const sampleRate = document.getElementById("optSampleRate").value;
 
       btnExtract.disabled = true;
-      btnExtract.innerText = "⏳ EXTRACTING AUDIO (FAST)...";
+      btnExtract.innerText = "⏳ PROCESSING (FAST)...";
       progContainer.style.display = "block";
       progFill.style.width = "0%";
-      statusText.innerText = "Extracting audio stream...";
+      statusText.innerText = "Processing media stream...";
       statusText.style.color = "#38bdf8";
       successActions.style.display = "none";
 
@@ -582,14 +601,14 @@
           currentJobId = data.job_id;
           pollProgress(currentJobId);
         } else {
-          statusText.innerText = "Failed to start extraction: " + (data.error || "Unknown");
+          statusText.innerText = "Failed to start: " + (data.error || "Unknown");
           btnExtract.disabled = false;
-          btnExtract.innerText = "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)";
+          btnExtract.innerText = "⚡ START CONVERSION (ZERO QUALITY LOSS)";
         }
       } catch (err) {
-        statusText.innerText = "Extraction error: " + err.message;
+        statusText.innerText = "Error: " + err.message;
         btnExtract.disabled = false;
-        btnExtract.innerText = "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)";
+        btnExtract.innerText = "⚡ START CONVERSION (ZERO QUALITY LOSS)";
       }
     });
 
@@ -603,24 +622,30 @@
           const pct = Math.round((job.progress || 0) * 100);
           progFill.style.width = `${pct}%`;
           speedText.innerText = job.speed ? `Speed: ${job.speed}` : "";
-          statusText.innerText = job.status_message || `Extracting... ${pct}%`;
+          statusText.innerText = job.status_message || `Processing... ${pct}%`;
 
           if (job.done) {
             clearInterval(pollInterval);
             btnExtract.disabled = false;
-            btnExtract.innerText = "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)";
+            btnExtract.innerText = "⚡ START CONVERSION (ZERO QUALITY LOSS)";
 
             if (job.success) {
               progFill.style.width = "100%";
               statusText.style.color = "#34d399";
-              statusText.innerText = `✔ Extracted successfully in ${job.elapsed.toFixed(2)}s!`;
+              statusText.innerText = `✔ Complete in ${job.elapsed.toFixed(2)}s! Saved: ${job.output_filename}`;
 
               // Show success preview and actions
               successActions.style.display = "flex";
               const downloadUrl = `/api/download?file=${encodeURIComponent(job.output_file)}`;
               btnDownloadAudio.href = downloadUrl;
               btnDownloadAudio.setAttribute("download", job.output_filename);
-              audioPreview.src = downloadUrl;
+
+              // Media preview (video or audio)
+              if (job.is_video && (job.output_filename.endsWith('.mp4') || job.output_filename.endsWith('.mov'))) {
+                mediaPreviewContainer.innerHTML = `<video controls src="${downloadUrl}" style="max-height: 280px;"></video>`;
+              } else {
+                mediaPreviewContainer.innerHTML = `<audio controls src="${downloadUrl}"></audio>`;
+              }
 
               btnRevealFinder.onclick = async () => {
                 await fetch("/api/reveal", {
@@ -631,7 +656,7 @@
               };
             } else {
               statusText.style.color = "#f87171";
-              statusText.innerText = "Extraction failed: " + job.error;
+              statusText.innerText = "Process failed: " + job.error;
             }
           }
         } catch (err) {

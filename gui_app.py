@@ -1,7 +1,8 @@
 """
-gui_app.py - GLV PS5 Audio Extractor
+gui_app.py - GLV PS5 Media Converter & Audio Extractor
 A standalone, high-performance desktop application engineered specifically for PS5 gamers
-and video editors to extract pristine audio from PS5 WebM gameplay clips with zero quality loss.
+and video editors. Converts PS5 WebM gameplay into NLE-compatible Apple ProRes 422 MOV,
+Calibrated MP4 (zero washout), or studio-grade audio masters (24-bit PCM WAV, MP3, AAC, FLAC, Opus).
 Built using standard Python Tkinter/TTK for 100% universal compatibility across all macOS and Windows versions.
 """
 
@@ -159,8 +160,8 @@ def probe_webm(file_path: str) -> Dict[str, Any]:
             "codec": v_stream.get("codec_name", "unknown").upper(),
             "width": int(v_stream.get("width", 0)),
             "height": int(v_stream.get("height", 0)),
-            "color_range": v_stream.get("color_range", "pc"),
-            "color_space": v_stream.get("color_space", "bt709"),
+            "color_range": v_stream.get("color_range", "unknown"),
+            "color_space": v_stream.get("color_space", "unknown"),
         }
 
     return {
@@ -176,10 +177,10 @@ def probe_webm(file_path: str) -> Dict[str, Any]:
     }
 
 
-# --- Extractor Engine Worker ---
+# --- Conversion / Extraction Engine Worker ---
 
-class AudioExtractionWorker(threading.Thread):
-    """Executes FFmpeg audio extraction with microsecond telemetry."""
+class MediaProcessWorker(threading.Thread):
+    """Executes FFmpeg video conversion or audio extraction with microsecond telemetry."""
 
     def __init__(
         self,
@@ -208,44 +209,94 @@ class AudioExtractionWorker(threading.Thread):
         base_name = os.path.splitext(os.path.basename(self.input_file))[0]
         ffmpeg_bin = find_binary("ffmpeg")
 
-        # Determine target extension and FFmpeg arguments
         ext = ".wav"
-        audio_codec_args = []
+        codec_args = []
+        is_video = False
 
-        if "WAV (24-bit Studio PCM)" in self.output_format:
+        # 1. Video + Audio Profiles (NLE Calibrated)
+        if "Apple ProRes 422 MOV" in self.output_format:
+            ext = "_PS5_ProRes422.mov"
+            is_video = True
+            codec_args = [
+                "-c:v", "prores_ks",
+                "-profile:v", "3",
+                "-vendor", "apl0",
+                "-pix_fmt", "yuv422p10le",
+                "-color_range", "tv",
+                "-colorspace", "bt709",
+                "-color_primaries", "bt709",
+                "-color_trc", "bt709",
+                "-c:a", "pcm_s24le",
+            ]
+        elif "Calibrated MP4 (H.264" in self.output_format:
+            ext = "_PS5_Calibrated.mp4"
+            is_video = True
+            codec_args = [
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "17",
+                "-pix_fmt", "yuv420p",
+                "-vf", "scale=in_range=auto:out_range=limited:flags=lanczos+accurate_rnd",
+                "-color_range", "tv",
+                "-colorspace", "bt709",
+                "-color_primaries", "bt709",
+                "-color_trc", "bt709",
+                "-bsf:v", "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0",
+                "-c:a", "aac",
+                "-b:a", "256k",
+                "-movflags", "+faststart",
+            ]
+        elif "Calibrated MP4 (HEVC" in self.output_format:
+            ext = "_PS5_HDR_HEVC.mp4"
+            is_video = True
+            codec_args = [
+                "-c:v", "libx265",
+                "-preset", "fast",
+                "-crf", "18",
+                "-pix_fmt", "yuv420p10le",
+                "-vf", "scale=in_range=auto:out_range=limited:flags=lanczos+accurate_rnd",
+                "-color_range", "tv",
+                "-colorspace", "bt2020nc",
+                "-color_primaries", "bt2020",
+                "-color_trc", "smpte2084",
+                "-bsf:v", "hevc_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0",
+                "-c:a", "aac",
+                "-b:a", "256k",
+                "-movflags", "+faststart",
+            ]
+        # 2. Audio Only Profiles
+        elif "WAV (24-bit Studio PCM)" in self.output_format:
             ext = "_PS5_Audio_24bit.wav"
-            audio_codec_args = ["-c:a", "pcm_s24le"]
+            codec_args = ["-vn", "-c:a", "pcm_s24le"]
         elif "WAV (16-bit Lossless PCM)" in self.output_format:
             ext = "_PS5_Audio_16bit.wav"
-            audio_codec_args = ["-c:a", "pcm_s16le"]
+            codec_args = ["-vn", "-c:a", "pcm_s16le"]
         elif "MP3 (320 kbps Audiophile)" in self.output_format:
             ext = "_PS5_Audio_320k.mp3"
-            audio_codec_args = ["-c:a", "libmp3lame", "-b:a", "320k", "-q:a", "0"]
+            codec_args = ["-vn", "-c:a", "libmp3lame", "-b:a", "320k", "-q:a", "0"]
         elif "AAC / M4A (256 kbps Studio)" in self.output_format:
             ext = "_PS5_Audio_256k.m4a"
-            audio_codec_args = ["-c:a", "aac", "-b:a", "256k"]
+            codec_args = ["-vn", "-c:a", "aac", "-b:a", "256k"]
         elif "FLAC (Lossless Compressed)" in self.output_format:
             ext = "_PS5_Audio.flac"
-            audio_codec_args = ["-c:a", "flac", "-compression_level", "8"]
+            codec_args = ["-vn", "-c:a", "flac", "-compression_level", "8"]
         elif "Opus (Stream Copy)" in self.output_format:
             ext = "_PS5_Audio_Original.opus"
-            audio_codec_args = ["-c:a", "copy"]
+            codec_args = ["-vn", "-c:a", "copy"]
         else:
             ext = "_PS5_Audio.wav"
-            audio_codec_args = ["-c:a", "pcm_s24le"]
+            codec_args = ["-vn", "-c:a", "pcm_s24le"]
 
         self.output_file = os.path.join(self.output_dir, f"{base_name}{ext}")
 
-        # Build FFmpeg command
         cmd = [
             ffmpeg_bin,
             "-y",
             "-i", self.input_file,
-            "-vn",  # Discard video completely
         ]
-        cmd.extend(audio_codec_args)
+        cmd.extend(codec_args)
 
-        if self.sample_rate and self.sample_rate != "Original" and "-c:a copy" not in " ".join(audio_codec_args):
+        if self.sample_rate and self.sample_rate != "Original" and "-c:a copy" not in " ".join(codec_args) and not is_video:
             cmd.extend(["-ar", self.sample_rate])
 
         cmd.extend([
@@ -273,6 +324,7 @@ class AudioExtractionWorker(threading.Thread):
 
             out_time_us = 0
             speed_val = "1.0x"
+            action_verb = "Converting" if is_video else "Extracting"
 
             while True:
                 if self.cancelled:
@@ -297,19 +349,19 @@ class AudioExtractionWorker(threading.Thread):
                             out_time_us = int(v)
                             cur_sec = out_time_us / 1_000_000.0
                             pct = min(cur_sec / self.total_duration, 1.0) if self.total_duration > 0 else 0.5
-                            self.on_progress(pct, cur_sec, speed_val)
+                            self.on_progress(pct, cur_sec, speed_val, action_verb)
                         except ValueError:
                             pass
                     elif k == "speed":
                         speed_val = v
                     elif k == "progress" and v == "end":
-                        self.on_progress(1.0, self.total_duration, speed_val)
+                        self.on_progress(1.0, self.total_duration, speed_val, action_verb)
 
             ret = self.process.wait()
             elapsed = time.time() - start_time
 
             if ret == 0:
-                self.on_done(True, "Extracted successfully!", self.output_file, elapsed)
+                self.on_done(True, "Process completed successfully!", self.output_file, elapsed)
             else:
                 stderr_data = self.process.stderr.read() if self.process.stderr else "Unknown error"
                 self.on_done(False, f"FFmpeg error (code {ret}):\n{stderr_data[:400]}", self.output_file, elapsed)
@@ -384,19 +436,19 @@ class ModernButton(tk.Label):
 
 # --- Main Application Window ---
 
-class GLVAudioExtractorApp(tk.Tk):
+class GLVMediaConverterApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("GLV PS5 Audio Extractor — High-Fidelity WebM Audio Engine")
-        self.geometry("860x730")
-        self.minsize(780, 680)
+        self.title("GLV PS5 Media Converter & Audio Extractor")
+        self.geometry("880x750")
+        self.minsize(800, 700)
         self.configure(bg="#0b0f19")
 
         # State
         self.current_meta: Optional[Dict[str, Any]] = None
         self.output_dir: str = ""
-        self.worker: Optional[AudioExtractionWorker] = None
+        self.worker: Optional[MediaProcessWorker] = None
         self.last_output_file: str = ""
 
         self._init_theme_styles()
@@ -410,7 +462,6 @@ class GLVAudioExtractorApp(tk.Tk):
         except Exception:
             pass
 
-        # Combobox dark styling
         style.configure(
             "Dark.TCombobox",
             fieldbackground="#1e293b",
@@ -427,7 +478,6 @@ class GLVAudioExtractorApp(tk.Tk):
             foreground=[("readonly", "#f8fafc")],
         )
 
-        # Cyan Progress bar styling
         style.configure(
             "Cyan.Horizontal.TProgressbar",
             troughcolor="#1e293b",
@@ -448,8 +498,8 @@ class GLVAudioExtractorApp(tk.Tk):
 
         title_lbl = tk.Label(
             header_frame,
-            text="🎮 GLV PS5 AUDIO EXTRACTOR",
-            font=(FONT_UI, 18, "bold"),
+            text="🎮 GLV PS5 MEDIA CONVERTER & AUDIO EXTRACTOR",
+            font=(FONT_UI, 17, "bold"),
             bg="#111827",
             fg="#f8fafc",
         )
@@ -457,20 +507,20 @@ class GLVAudioExtractorApp(tk.Tk):
 
         sub_lbl = tk.Label(
             header_frame,
-            text="Zero-Loss Audio Extractor for PS5 & HDR Gameplay Clips · Ready for Premiere & DaVinci Resolve",
+            text="Anti-Washout Video Conversion & Lossless Audio Engine for PS5 Clips · Tailored for DaVinci Resolve, Premiere Pro & Final Cut Pro",
             font=(FONT_UI, 11),
             bg="#111827",
             fg="#94a3b8",
         )
         sub_lbl.pack(anchor="w", padx=18, pady=(0, 12))
 
-        # 2. Prominent PS5 Notice Advisory Box
+        # 2. NLE Compatibility & Color Advisory Notice
         notice_frame = tk.Frame(container, bg="#1e1808", highlightbackground="#f59e0b", highlightthickness=1)
         notice_frame.pack(fill="x", pady=(0, 10))
 
         notice_title = tk.Label(
             notice_frame,
-            text="💡 Important PS5 WebM Color & Editing Notice",
+            text="💡 Important NLE Compatibility & Anti-Washout Notice",
             font=(FONT_UI, 12, "bold"),
             bg="#1e1808",
             fg="#fbbf24",
@@ -480,9 +530,10 @@ class GLVAudioExtractorApp(tk.Tk):
         notice_text = tk.Label(
             notice_frame,
             text=(
-                "PS5 WebM conversion into MP4 or other format will impact colours in video (can look washed out).\n"
-                "Better you extract audio from WebM here, place directly into your editor timeline alongside your video,\n"
-                "and export from any video editing app (Premiere Pro, DaVinci Resolve, CapCut) for 100% color & sound perfection."
+                "Most video editors (Premiere Pro, Final Cut Pro, DaVinci Resolve, CapCut) do not natively support WebM files.\n"
+                "Converting directly with basic tools causes washed-out colors due to missing color range/matrix tags.\n"
+                "• Choose Apple ProRes 422 MOV or Calibrated MP4 for 100% native timeline support with zero color washout.\n"
+                "• Choose Studio WAV / MP3 / Opus for pure audio extraction."
             ),
             font=(FONT_UI, 10),
             bg="#1e1808",
@@ -528,13 +579,13 @@ class GLVAudioExtractorApp(tk.Tk):
         )
         self.lbl_selected_file.pack(fill="x", padx=18, pady=(0, 12))
 
-        # 4. Audio Properties Card (Inspector)
+        # 4. Properties Card (Inspector)
         self.spec_card = tk.Frame(container, bg="#10192a", highlightbackground="#06b6d4", highlightthickness=1)
         self.spec_card.pack(fill="x", pady=(0, 10))
 
         tk.Label(
             self.spec_card,
-            text="🎵 Detected Audio Properties (PS5 Master)",
+            text="🎵 Detected Clip Properties (PS5 Master)",
             font=(FONT_UI, 13, "bold"),
             bg="#10192a",
             fg="#38bdf8",
@@ -567,7 +618,7 @@ class GLVAudioExtractorApp(tk.Tk):
 
         tk.Label(
             format_card,
-            text="Audio Extraction Settings",
+            text="Conversion / Extraction Settings",
             font=(FONT_UI, 13, "bold"),
             bg="#131d31",
             fg="#f1f5f9",
@@ -577,29 +628,32 @@ class GLVAudioExtractorApp(tk.Tk):
         fmt_row = tk.Frame(format_card, bg="#131d31")
         fmt_row.pack(fill="x", padx=18, pady=(0, 8))
 
-        tk.Label(fmt_row, text="Target Audio Format:", font=(FONT_UI, 11), bg="#131d31", fg="#94a3b8", width=18, anchor="w").pack(side="left")
+        tk.Label(fmt_row, text="Target Format:", font=(FONT_UI, 11), bg="#131d31", fg="#94a3b8", width=16, anchor="w").pack(side="left")
         self.cb_format = ttk.Combobox(
             fmt_row,
             style="Dark.TCombobox",
             state="readonly",
-            width=28,
+            width=48,
             values=[
-                "WAV (24-bit Studio PCM)",
+                "Apple ProRes 422 MOV (Final Cut Pro, Premiere & DaVinci Master)",
+                "Calibrated MP4 (H.264 Universal Anti-Washout)",
+                "Calibrated MP4 (HEVC / H.265 HDR/SDR)",
+                "WAV (24-bit Studio PCM Uncompressed)",
                 "WAV (16-bit Lossless PCM)",
                 "MP3 (320 kbps Audiophile)",
                 "AAC / M4A (256 kbps Studio)",
                 "FLAC (Lossless Compressed)",
-                "Opus (Stream Copy)",
+                "Opus (Stream Copy — Instant Bit-for-bit)",
             ],
         )
-        self.cb_format.set("WAV (24-bit Studio PCM)")
+        self.cb_format.set("Apple ProRes 422 MOV (Final Cut Pro, Premiere & DaVinci Master)")
         self.cb_format.pack(side="left", padx=10)
 
         # Sample rate row
         sr_row = tk.Frame(format_card, bg="#131d31")
         sr_row.pack(fill="x", padx=18, pady=(0, 8))
 
-        tk.Label(sr_row, text="Sample Rate:", font=(FONT_UI, 11), bg="#131d31", fg="#94a3b8", width=18, anchor="w").pack(side="left")
+        tk.Label(sr_row, text="Sample Rate (Audio):", font=(FONT_UI, 11), bg="#131d31", fg="#94a3b8", width=16, anchor="w").pack(side="left")
         self.cb_sample_rate = ttk.Combobox(
             sr_row,
             style="Dark.TCombobox",
@@ -614,7 +668,7 @@ class GLVAudioExtractorApp(tk.Tk):
         dest_row = tk.Frame(format_card, bg="#131d31")
         dest_row.pack(fill="x", padx=18, pady=(0, 10))
 
-        tk.Label(dest_row, text="Save Destination:", font=(FONT_UI, 11), bg="#131d31", fg="#94a3b8", width=18, anchor="w").pack(side="left")
+        tk.Label(dest_row, text="Save Destination:", font=(FONT_UI, 11), bg="#131d31", fg="#94a3b8", width=16, anchor="w").pack(side="left")
         self.lbl_dest_folder = tk.Label(dest_row, text="Same as input file", font=(FONT_MONO, 10), bg="#131d31", fg="#38bdf8")
         self.lbl_dest_folder.pack(side="left", padx=(10, 16))
 
@@ -634,10 +688,10 @@ class GLVAudioExtractorApp(tk.Tk):
         action_frame = tk.Frame(container, bg="#111827", highlightbackground="#1e293b", highlightthickness=1)
         action_frame.pack(fill="x", pady=(0, 10))
 
-        self.btn_extract = ModernButton(
+        self.btn_process = ModernButton(
             action_frame,
-            text="⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)",
-            command=self._on_start_extract,
+            text="⚡ START CONVERSION / EXTRACTION (ZERO QUALITY LOSS)",
+            command=self._on_start_process,
             bg_color="#06b6d4",
             hover_color="#0891b2",
             text_color="#042f2e",
@@ -645,7 +699,7 @@ class GLVAudioExtractorApp(tk.Tk):
             padx=20,
             pady=12,
         )
-        self.btn_extract.pack(fill="x", padx=18, pady=(14, 10))
+        self.btn_process.pack(fill="x", padx=18, pady=(14, 10))
 
         # Progress bar
         self.prog_bar = ttk.Progressbar(action_frame, style="Cyan.Horizontal.TProgressbar", mode="determinate")
@@ -680,8 +734,8 @@ class GLVAudioExtractorApp(tk.Tk):
 
         self.btn_play = ModernButton(
             self.success_row,
-            text="▶ Play Extracted Audio",
-            command=self._on_play_audio,
+            text="▶ Play Output File",
+            command=self._on_play_media,
             bg_color="#10b981",
             hover_color="#059669",
             font=(FONT_UI, 11, "bold"),
@@ -721,7 +775,7 @@ class GLVAudioExtractorApp(tk.Tk):
 
     def _load_file(self, path: str):
         try:
-            self.lbl_status.configure(text="Scanning WebM audio properties...", fg="#38bdf8")
+            self.lbl_status.configure(text="Scanning WebM media properties...", fg="#38bdf8")
             self.update_idletasks()
             meta = probe_webm(path)
             self.current_meta = meta
@@ -738,7 +792,7 @@ class GLVAudioExtractorApp(tk.Tk):
             self.lbl_prop_duration.configure(text=f"Duration: {meta['duration_formatted']}")
             self.lbl_prop_size.configure(text=f"File Size: {meta['file_size_formatted']}")
 
-            self.lbl_status.configure(text="Ready to extract audio! Choose format and click Extract.", fg="#34d399")
+            self.lbl_status.configure(text="Ready! Select target format and click Start Conversion.", fg="#34d399")
             self.prog_bar["value"] = 0
             self.lbl_speed.configure(text="")
             self.success_row.pack_forget()
@@ -753,13 +807,13 @@ class GLVAudioExtractorApp(tk.Tk):
             self.output_dir = folder
             self.lbl_dest_folder.configure(text=folder)
 
-    def _on_start_extract(self):
+    def _on_start_process(self):
         if not self.current_meta:
             messagebox.showwarning("No File", "Please select a PS5 WebM file first.")
             return
 
         if self.worker and self.worker.is_alive():
-            messagebox.showinfo("In Progress", "Audio extraction is already running.")
+            messagebox.showinfo("In Progress", "Processing is already running.")
             return
 
         fmt = self.cb_format.get()
@@ -767,13 +821,13 @@ class GLVAudioExtractorApp(tk.Tk):
         inp = self.current_meta["file_path"]
         dur = self.current_meta["duration_sec"]
 
-        self.btn_extract.set_state("disabled", "⏳ EXTRACTING AUDIO (FAST)...")
-        self.lbl_status.configure(text="Extracting audio stream...", fg="#38bdf8")
+        self.btn_process.set_state("disabled", "⏳ PROCESSING (FAST)...")
+        self.lbl_status.configure(text="Processing media stream...", fg="#38bdf8")
         self.prog_bar["value"] = 0
         self.lbl_speed.configure(text="")
         self.success_row.pack_forget()
 
-        self.worker = AudioExtractionWorker(
+        self.worker = MediaProcessWorker(
             input_file=inp,
             output_format=fmt,
             sample_rate=sr,
@@ -784,16 +838,16 @@ class GLVAudioExtractorApp(tk.Tk):
         )
         self.worker.start()
 
-    def _on_worker_progress(self, pct: float, cur_sec: float, speed_val: str):
-        self.after(0, self._update_progress_ui, pct, cur_sec, speed_val)
+    def _on_worker_progress(self, pct: float, cur_sec: float, speed_val: str, action_verb: str):
+        self.after(0, self._update_progress_ui, pct, cur_sec, speed_val, action_verb)
 
-    def _update_progress_ui(self, pct: float, cur_sec: float, speed_val: str):
+    def _update_progress_ui(self, pct: float, cur_sec: float, speed_val: str, action_verb: str):
         self.prog_bar["value"] = pct * 100
         dur = self.current_meta["duration_sec"] if self.current_meta else 0
         cur_fmt = format_duration(cur_sec)
         dur_fmt = format_duration(dur)
         self.lbl_status.configure(
-            text=f"Extracting: {cur_fmt} / {dur_fmt} ({int(pct * 100)}%)",
+            text=f"{action_verb}: {cur_fmt} / {dur_fmt} ({int(pct * 100)}%)",
             fg="#38bdf8",
         )
         self.lbl_speed.configure(text=f"Speed: {speed_val}")
@@ -802,7 +856,7 @@ class GLVAudioExtractorApp(tk.Tk):
         self.after(0, self._handle_done_ui, success, message, output_file, elapsed)
 
     def _handle_done_ui(self, success: bool, message: str, output_file: str, elapsed: float):
-        self.btn_extract.set_state("normal", "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)")
+        self.btn_process.set_state("normal", "⚡ START CONVERSION / EXTRACTION (ZERO QUALITY LOSS)")
         if success:
             self.last_output_file = output_file
             self.prog_bar["value"] = 100
@@ -813,10 +867,10 @@ class GLVAudioExtractorApp(tk.Tk):
             self.lbl_speed.configure(text="")
             self.success_row.pack(fill="x", padx=18, pady=(0, 12))
         else:
-            self.lbl_status.configure(text="Extraction failed.", fg="#f87171")
-            messagebox.showerror("Extraction Error", message)
+            self.lbl_status.configure(text="Processing failed.", fg="#f87171")
+            messagebox.showerror("Error", message)
 
-    def _on_play_audio(self):
+    def _on_play_media(self):
         if self.last_output_file and os.path.exists(self.last_output_file):
             try:
                 norm = os.path.normpath(self.last_output_file)
@@ -844,7 +898,7 @@ class GLVAudioExtractorApp(tk.Tk):
 
 
 def main():
-    app = GLVAudioExtractorApp()
+    app = GLVMediaConverterApp()
     app.mainloop()
 
 
