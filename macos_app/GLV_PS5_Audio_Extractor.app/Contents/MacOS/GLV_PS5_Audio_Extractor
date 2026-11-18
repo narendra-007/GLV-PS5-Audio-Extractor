@@ -1,0 +1,20 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../Resources" && pwd )"
+cd "$DIR"
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+PYTHON_BIN=""
+for p in "/opt/homebrew/bin/python3" "/usr/local/bin/python3" "$(which python3 2>/dev/null)" "/usr/bin/python3"; do
+    if [ -n "$p" ] && [ -x "$p" ]; then
+        PYTHON_BIN="$p"
+        break
+    fi
+done
+
+if [ -z "$PYTHON_BIN" ]; then
+    osascript -e 'display alert "Python 3 Required" message "Python 3 was not found. Please install Python 3 via python.org or Homebrew." as critical'
+    exit 1
+fi
+
+exec "$PYTHON_BIN" gui_app.py "$@"

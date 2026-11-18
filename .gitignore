@@ -1,0 +1,30 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# PyInstaller temporary build artifacts
+build/
+*.spec
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Output media from testing
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.opus
+!sample*
