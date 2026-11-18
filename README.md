@@ -1,11 +1,15 @@
 # 🎮 GLV PS5 Audio Extractor
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-blue?style=flat-square&logo=apple&logoColor=white)](https://github.com/narendra-007/GLV-PS5-Audio-Extractor)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20Web%20%7C%20Windows-blue?style=flat-square&logo=apple&logoColor=white)](https://github.com/narendra-007/GLV-PS5-Audio-Extractor)
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Zero Quality Loss](https://img.shields.io/badge/Audio-Lossless%20%26%20Stream%20Copy-06b6d4?style=flat-square)](#)
 
-A dedicated, standalone desktop application engineered specifically for **PS5 gamers, streamers, and video editors** to extract pristine audio from PS5 WebM gameplay clips with zero quality loss and no video color degradation.
+A dedicated, high-performance audio extraction suite engineered specifically for **PS5 gamers, streamers, and video editors** to extract pristine master audio from PS5 WebM gameplay clips with zero quality loss and no video color degradation.
+
+Available as:
+1. 🌐 **Web App Edition (macOS & Cross-Platform)** — Runs locally in Safari / Chrome with zero installation and zero GUI bugs.
+2. 💻 **Windows Standalone EXE** — Portable, single-file 12 MB executable.
 
 ---
 
@@ -26,66 +30,42 @@ Most conventional converters convert the entire WebM video into MP4. During this
 
 ---
 
-## ✨ Key Features
+## 🌐 macOS Web App Edition (Recommended for Mac)
 
-- **⚡ Instant Opus Stream Copy:** Extracts original Opus/AAC audio bit-for-bit in under 1 second without re-encoding.
-- **🎧 Studio-Grade Master Exports:**
-  - `WAV (24-bit Studio PCM)` — Uncompressed 24-bit audio master for professional mixing.
-  - `WAV (16-bit Lossless PCM)` — Standard CD-quality lossless audio.
-  - `FLAC (Lossless Compressed)` — Bit-perfect, reduced storage footprint.
-  - `MP3 (320 kbps Audiophile)` — Universal high-bitrate compatibility.
-  - `AAC / M4A (256 kbps Studio)` — Optimized for Apple ecosystem & YouTube.
-- **🔍 Deep WebM Inspector:** Instant FFprobe analysis detailing Audio Codec, Sample Rate, Channels (Stereo/5.1), Bitrate, Duration, and File Size.
-- **📊 Real-Time Microsecond Telemetry:** Live progress bar, timestamp tracker, and encoding speed multipliers (e.g. `24.5x`).
-- **🖥️ 100% Universal Native GUI:** Built with native Tkinter/TTK — runs instantaneously on both Windows and macOS without external GUI dependencies or blank-screen rendering bugs.
-- **🚀 One-Click Standalone EXE:** Single-file Windows binary with no installer, DLLs, or Python setup required.
+Runs as a local web app with zero dependencies. Runs instantly on Safari, Chrome, Edge, and Firefox.
 
----
+### ✨ Web App Highlights:
+- **Zero GUI or Display Bugs:** Completely immune to macOS Tkinter / CustomTkinter blank-screen glitches.
+- **Native macOS File Chooser:** Click "Choose File on Mac" to pick files via native Finder sheets (`osascript`).
+- **Drag & Drop:** Drag any PS5 `.webm` file directly into your browser window.
+- **In-Browser Audio Player:** Listen and verify your extracted audio directly inside the web app.
+- **Reveal in Finder:** One-click button to highlight the extracted file in Finder.
 
-## 📥 Download Pre-Built Binaries
-
-| Operating System | Download | Instructions |
-| :--- | :--- | :--- |
-| **Windows 10 / 11** | [**GLV_PS5_Audio_Extractor.exe**](GLV_PS5_Audio_Extractor.exe) | Single-file executable. Just double-click to run. |
-| **macOS (Apple Silicon & Intel)** | [**GLV_PS5_Audio_Extractor_macOS.zip**](GLV_PS5_Audio_Extractor_macOS.zip) | Extract zip and double-click `run.command` or `GLV_PS5_Audio_Extractor.app`. |
+### 🚀 How to Run on macOS:
+1. Clone or download this repository.
+2. Double-click **`run_web_mac.command`** in Finder.
+   *(Or run `python3 web_app.py` in Terminal).*
+3. Your default browser will automatically open to `http://127.0.0.1:5050`.
 
 ---
 
-## 🛠️ Running from Source
+## 💻 Windows Standalone EXE
 
-### Prerequisites
-- Python 3.8 or newer
-- FFmpeg installed and available on system PATH (or in `/opt/homebrew/bin` on Mac)
+Download the pre-compiled, single-file executable:
+* **[GLV_PS5_Audio_Extractor.exe](https://github.com/narendra-007/GLV-PS5-Audio-Extractor/releases/latest)** (12 MB, no install required).
 
-### Windows
-```bash
-git clone https://github.com/narendra-007/GLV-PS5-Audio-Extractor.git
-cd GLV-PS5-Audio-Extractor
-python gui_app.py
-```
-
-### macOS / Linux
-```bash
-git clone https://github.com/narendra-007/GLV-PS5-Audio-Extractor.git
-cd GLV-PS5-Audio-Extractor
-python3 gui_app.py
-```
+Just double-click to run!
 
 ---
 
-## 🔨 Building Standalone Executables
+## 🎧 Supported Audio Formats
 
-### Windows (Single-File `.exe`)
-```cmd
-build_exe.bat
-```
-*Compiles a single standalone executable `GLV_PS5_Audio_Extractor.exe` using PyInstaller.*
-
-### macOS (Native `.app` Bundle)
-```bash
-bash build_mac_app.sh
-```
-*Compiles `dist/GLV_PS5_Audio_Extractor.app` and launches it automatically.*
+- **Opus (Stream Copy)** — Instant bit-for-bit extraction in under 1 second without re-encoding.
+- **WAV (24-bit Studio PCM)** — Master studio audio for DaVinci Resolve, Premiere Pro, and Final Cut Pro.
+- **WAV (16-bit Lossless PCM)** — Standard CD quality.
+- **FLAC (Lossless Compressed)** — Bit-perfect, reduced storage footprint.
+- **MP3 (320 kbps Audiophile)** — Maximum compatibility.
+- **AAC / M4A (256 kbps Studio)** — Apple and YouTube standard.
 
 ---
 

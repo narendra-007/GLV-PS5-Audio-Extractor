@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLV PS5 Audio Extractor — Web Edition</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --accent-cyan: #06b6d4;
+      --accent-cyan-hover: #0891b2;
+      --accent-indigo: #6366f1;
+      --accent-indigo-hover: #4f46e5;
+      --accent-amber: #f59e0b;
+      --accent-green: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--sans-font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Card styling */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Header */
+    .header-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .header-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-sub {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    /* Notice Box */
+    .notice-card {
+      background: #1e1808;
+      border: 1px solid var(--accent-amber);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .notice-title {
+      color: #fbbf24;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .notice-text {
+      color: #fef3c7;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    /* Drop / Selection Zone */
+    .drop-zone {
+      border: 2px dashed #2d3748;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(17, 24, 39, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.08);
+      transform: scale(1.01);
+    }
+
+    .drop-zone-text {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .drop-zone-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .btn-indigo {
+      background: var(--accent-indigo);
+      color: #fff;
+    }
+    .btn-indigo:hover {
+      background: var(--accent-indigo-hover);
+    }
+
+    .btn-cyan {
+      background: var(--accent-cyan);
+      color: #042f2e;
+    }
+    .btn-cyan:hover:not(:disabled) {
+      background: var(--accent-cyan-hover);
+    }
+
+    .btn-green {
+      background: var(--accent-green);
+      color: #fff;
+    }
+    .btn-green:hover {
+      background: #059669;
+    }
+
+    .btn-dark {
+      background: #1f293d;
+      color: #f8fafc;
+      border: 1px solid #334155;
+    }
+    .btn-dark:hover {
+      background: #334155;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-large {
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    /* Selected file pill */
+    .selected-file-bar {
+      margin-top: 10px;
+      font-family: var(--mono-font);
+      font-size: 12px;
+      color: #38bdf8;
+      background: rgba(15, 23, 42, 0.7);
+      padding: 8px 14px;
+      border-radius: 6px;
+      word-break: break-all;
+      display: none;
+    }
+
+    /* Inspector Specs Grid */
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px 24px;
+      margin-top: 10px;
+    }
+
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .spec-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .spec-val {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .spec-val-highlight {
+      color: #34d399;
+    }
+
+    /* Settings rows */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .setting-label {
+      width: 180px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .setting-select {
+      flex: 1;
+      max-width: 340px;
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid #334155;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .setting-select:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    /* Progress section */
+    .progress-bar-container {
+      width: 100%;
+      height: 12px;
+      background: #1e293b;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 14px;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #06b6d4, #3b82f6);
+      transition: width 0.15s ease;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 12.5px;
+    }
+
+    .status-text {
+      color: var(--text-muted);
+    }
+
+    .speed-text {
+      font-family: var(--mono-font);
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    /* Success box */
+    .success-actions {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #1e293b;
+    }
+
+    .success-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    audio {
+      width: 100%;
+      height: 38px;
+      border-radius: 6px;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- 1. Header -->
+    <div class="card header-card">
+      <div class="header-title">🎮 GLV PS5 AUDIO EXTRACTOR</div>
+      <div class="header-sub">Zero-Loss Web Audio Engine for PS5 Gameplay Clips · Ready for DaVinci Resolve, Premiere & Final Cut Pro</div>
+    </div>
+
+    <!-- 2. PS5 WebM Color Advisory Notice -->
+    <div class="notice-card">
+      <div class="notice-title">💡 Important PS5 WebM Color &amp; Editing Notice</div>
+      <div class="notice-text">
+        PS5 WebM conversion into MP4 or other format will impact colours in video (can look washed out).
+        Better you extract audio from WebM here, place directly into your editor timeline alongside your video,
+        and export from any video editing app (Premiere Pro, DaVinci Resolve, CapCut) for 100% color &amp; sound perfection.
+      </div>
+    </div>
+
+    <!-- 3. File Input Card -->
+    <div class="card">
+      <div style="font-weight: 700; font-size: 15px; margin-bottom: 12px;">Select PS5 WebM Recording</div>
+
+      <div class="drop-zone" id="dropZone">
+        <div style="font-size: 28px;">📁</div>
+        <div class="drop-zone-text">Drag and drop your PS5 <b>.webm</b> recording clip here</div>
+        <div class="drop-zone-actions">
+          <button class="btn btn-indigo" id="btnBrowseNative">📂 Choose File on Mac</button>
+          <label class="btn btn-dark" style="margin: 0; cursor: pointer;">
+            Browse via Browser
+            <input type="file" id="browserFileInput" accept=".webm,.mp4,.mkv,.opus" style="display: none;">
+          </label>
+        </div>
+      </div>
+
+      <div class="selected-file-bar" id="selectedFileBar"></div>
+    </div>
+
+    <!-- 4. Deep Audio Properties Card -->
+    <div class="card" id="specCard" style="display: none; border-color: #06b6d4;">
+      <div style="font-weight: 700; font-size: 15px; color: #38bdf8; margin-bottom: 8px;">🎵 Detected Audio Properties (PS5 Master)</div>
+      
+      <div class="specs-grid">
+        <div class="spec-item">
+          <span class="spec-label">Audio Codec</span>
+          <span class="spec-val" id="specCodec">—</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">Sample Rate</span>
+          <span class="spec-val spec-val-highlight" id="specSampleRate">—</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">Channels</span>
+          <span class="spec-val" id="specChannels">—</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">Bitrate</span>
+          <span class="spec-val" id="specBitrate">—</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">Duration</span>
+          <span class="spec-val" id="specDuration">—</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">File Size</span>
+          <span class="spec-val" id="specSize">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Extraction Settings -->
+    <div class="card" id="settingsCard">
+      <div style="font-weight: 700; font-size: 15px; margin-bottom: 14px;">Audio Extraction Settings</div>
+
+      <div class="setting-row">
+        <div class="setting-label">Target Audio Format:</div>
+        <select class="setting-select" id="optFormat">
+          <option value="WAV (24-bit Studio PCM)">WAV (24-bit Studio PCM) — Best for NLEs</option>
+          <option value="WAV (16-bit Lossless PCM)">WAV (16-bit Lossless PCM)</option>
+          <option value="MP3 (320 kbps Audiophile)">MP3 (320 kbps Audiophile)</option>
+          <option value="AAC / M4A (256 kbps Studio)">AAC / M4A (256 kbps Studio)</option>
+          <option value="FLAC (Lossless Compressed)">FLAC (Lossless Compressed)</option>
+          <option value="Opus (Stream Copy)">Opus (Stream Copy — Instant Bit-for-bit)</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">Sample Rate:</div>
+        <select class="setting-select" id="optSampleRate">
+          <option value="Original">Original (Match Source)</option>
+          <option value="48000">48,000 Hz (Standard Film/TV)</option>
+          <option value="44100">44,100 Hz (Standard CD)</option>
+          <option value="96000">96,000 Hz (Hi-Res)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 6. Action & Progress Card -->
+    <div class="card">
+      <button class="btn btn-cyan btn-large" id="btnExtract" disabled>⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)</button>
+
+      <div class="progress-bar-container" id="progContainer">
+        <div class="progress-bar-fill" id="progFill"></div>
+      </div>
+
+      <div class="status-row">
+        <div class="status-text" id="statusText">Ready. Select a PS5 WebM file above to begin.</div>
+        <div class="speed-text" id="speedText"></div>
+      </div>
+
+      <!-- Success & Preview Actions -->
+      <div class="success-actions" id="successActions">
+        <audio id="audioPreview" controls></audio>
+        <div class="success-btns">
+          <button class="btn btn-green" id="btnRevealFinder">📁 Reveal in Finder</button>
+          <a class="btn btn-dark" id="btnDownloadAudio" href="#" download>⬇️ Download Extracted Audio</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentFilePath = "";
+    let currentJobId = "";
+    let pollInterval = null;
+
+    const dropZone = document.getElementById("dropZone");
+    const browserFileInput = document.getElementById("browserFileInput");
+    const btnBrowseNative = document.getElementById("btnBrowseNative");
+    const selectedFileBar = document.getElementById("selectedFileBar");
+    const specCard = document.getElementById("specCard");
+    const btnExtract = document.getElementById("btnExtract");
+    const progContainer = document.getElementById("progContainer");
+    const progFill = document.getElementById("progFill");
+    const statusText = document.getElementById("statusText");
+    const speedText = document.getElementById("speedText");
+    const successActions = document.getElementById("successActions");
+    const btnRevealFinder = document.getElementById("btnRevealFinder");
+    const btnDownloadAudio = document.getElementById("btnDownloadAudio");
+    const audioPreview = document.getElementById("audioPreview");
+
+    // Native Mac File Picker Dialog
+    btnBrowseNative.addEventListener("click", async () => {
+      try {
+        statusText.innerText = "Opening file picker...";
+        const res = await fetch("/api/select-file", { method: "POST" });
+        const data = await res.json();
+        if (data.file_path) {
+          loadFileMetadata(data);
+        } else {
+          statusText.innerText = "Ready. Select a PS5 WebM file above.";
+        }
+      } catch (err) {
+        console.error(err);
+        statusText.innerText = "Error opening file picker: " + err.message;
+      }
+    });
+
+    // Browser File Input
+    browserFileInput.addEventListener("change", async (e) => {
+      if (e.target.files && e.target.files[0]) {
+        uploadFile(e.target.files[0]);
+      }
+    });
+
+    // Drag & Drop
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("dragover");
+    });
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        uploadFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    async function uploadFile(file) {
+      statusText.innerText = `Loading "${file.name}"...`;
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.error) {
+          statusText.innerText = "Error: " + data.error;
+          return;
+        }
+        loadFileMetadata(data);
+      } catch (err) {
+        statusText.innerText = "Upload failed: " + err.message;
+      }
+    }
+
+    function loadFileMetadata(meta) {
+      currentFilePath = meta.file_path;
+      selectedFileBar.style.display = "block";
+      selectedFileBar.innerText = `Selected: ${meta.file_name} (${meta.file_size_formatted})`;
+
+      const a = meta.audio || {};
+      document.getElementById("specCodec").innerText = `${a.codec || 'N/A'} (PS5 Master)`;
+      document.getElementById("specSampleRate").innerText = `${(a.sample_rate || 0).toLocaleString()} Hz`;
+      document.getElementById("specChannels").innerText = a.channel_label || 'Stereo';
+      document.getElementById("specBitrate").innerText = `${a.bitrate_kbps || 0} kbps`;
+      document.getElementById("specDuration").innerText = meta.duration_formatted || '00:00';
+      document.getElementById("specSize").innerText = meta.file_size_formatted || '0 MB';
+
+      specCard.style.display = "block";
+      btnExtract.disabled = false;
+      statusText.innerText = "Ready to extract! Select format and click Extract.";
+      statusText.style.color = "#34d399";
+      progContainer.style.display = "none";
+      successActions.style.display = "none";
+      speedText.innerText = "";
+    }
+
+    // Start Extraction
+    btnExtract.addEventListener("click", async () => {
+      if (!currentFilePath) return;
+
+      const format = document.getElementById("optFormat").value;
+      const sampleRate = document.getElementById("optSampleRate").value;
+
+      btnExtract.disabled = true;
+      btnExtract.innerText = "⏳ EXTRACTING AUDIO (FAST)...";
+      progContainer.style.display = "block";
+      progFill.style.width = "0%";
+      statusText.innerText = "Extracting audio stream...";
+      statusText.style.color = "#38bdf8";
+      successActions.style.display = "none";
+
+      try {
+        const res = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_path: currentFilePath,
+            format: format,
+            sample_rate: sampleRate,
+          })
+        });
+        const data = await res.json();
+        if (data.job_id) {
+          currentJobId = data.job_id;
+          pollProgress(currentJobId);
+        } else {
+          statusText.innerText = "Failed to start extraction: " + (data.error || "Unknown");
+          btnExtract.disabled = false;
+          btnExtract.innerText = "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)";
+        }
+      } catch (err) {
+        statusText.innerText = "Extraction error: " + err.message;
+        btnExtract.disabled = false;
+        btnExtract.innerText = "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)";
+      }
+    });
+
+    function pollProgress(jobId) {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/progress?id=${jobId}`);
+          const job = await res.json();
+
+          const pct = Math.round((job.progress || 0) * 100);
+          progFill.style.width = `${pct}%`;
+          speedText.innerText = job.speed ? `Speed: ${job.speed}` : "";
+          statusText.innerText = job.status_message || `Extracting... ${pct}%`;
+
+          if (job.done) {
+            clearInterval(pollInterval);
+            btnExtract.disabled = false;
+            btnExtract.innerText = "⚡ EXTRACT AUDIO FROM PS5 WEBM (ZERO LOSS)";
+
+            if (job.success) {
+              progFill.style.width = "100%";
+              statusText.style.color = "#34d399";
+              statusText.innerText = `✔ Extracted successfully in ${job.elapsed.toFixed(2)}s!`;
+
+              // Show success preview and actions
+              successActions.style.display = "flex";
+              const downloadUrl = `/api/download?file=${encodeURIComponent(job.output_file)}`;
+              btnDownloadAudio.href = downloadUrl;
+              btnDownloadAudio.setAttribute("download", job.output_filename);
+              audioPreview.src = downloadUrl;
+
+              btnRevealFinder.onclick = async () => {
+                await fetch("/api/reveal", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ file_path: job.output_file })
+                });
+              };
+            } else {
+              statusText.style.color = "#f87171";
+              statusText.innerText = "Extraction failed: " + job.error;
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }, 250);
+    }
+  </script>
+</body>
+</html>
